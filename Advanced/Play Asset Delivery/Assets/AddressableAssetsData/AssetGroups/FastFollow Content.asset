@@ -21,6 +21,12 @@ MonoBehaviour:
     m_Address: Sphere
     m_ReadOnly: 0
     m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 850ecff98202c4740acb9c78f29a21a1
+    m_Address: Assets/Backgrounds/Balcony_Day.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: b5c09aef320017846b8c82aaae72d986, type: 2}
   m_SchemaSet:

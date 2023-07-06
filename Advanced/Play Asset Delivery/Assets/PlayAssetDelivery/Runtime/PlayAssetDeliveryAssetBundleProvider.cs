@@ -1,6 +1,8 @@
 using System;
+using System.Collections;
 using System.ComponentModel;
 using System.IO;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Android;
 using UnityEngine.ResourceManagement.ResourceLocations;
@@ -14,19 +16,35 @@ namespace AddressablesPlayAssetDelivery
     [DisplayName("Play Asset Delivery Provider")]
     public class PlayAssetDeliveryAssetBundleProvider : AssetBundleProvider
     {
-        ProvideHandle m_ProviderInterface;
-        public override void Provide(ProvideHandle providerInterface)
+		ProvideHandle m_ProviderInterface;
+		private bool isDownloading;
+
+        public async override void Provide(ProvideHandle providerInterface)
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            m_ProviderInterface = providerInterface;
+			Debug.Log("LOAD FROM ASSET PACK");
             LoadFromAssetPack(providerInterface);
 #else
             base.Provide(providerInterface);
 #endif
         }
 
-        void LoadFromAssetPack(ProvideHandle providerInterface)
+        async void LoadFromAssetPack(ProvideHandle providerInterface)
         {
+			float targetTime = 1;
+			float currentTime = 0;
+			while (isDownloading)
+			{
+				await Task.Yield();
+				currentTime += Time.deltaTime;
+				if (currentTime > targetTime)
+				{
+					currentTime = 0;
+					Debug.Log("Waiting for download to complete");
+				}
+			}
+			m_ProviderInterface = providerInterface;
+
             string bundleName = Path.GetFileNameWithoutExtension(providerInterface.Location.InternalId);
             if (!PlayAssetDeliveryRuntimeData.Instance.BundleNameToAssetPack.ContainsKey(bundleName))
             {
@@ -45,7 +63,7 @@ namespace AddressablesPlayAssetDelivery
                 else
                 {
                     // Download the asset pack
-                    DownloadRemoteAssetPack(assetPackName);
+                    DownloadRemoteAssetPack(assetPackName, providerInterface);
                 }
             }
         }
@@ -53,21 +71,21 @@ namespace AddressablesPlayAssetDelivery
         public override void Release(IResourceLocation location, object asset)
         {
             base.Release(location, asset);
-            m_ProviderInterface = default;
         }
 
-        void DownloadRemoteAssetPack(string assetPackName)
+        void DownloadRemoteAssetPack(string assetPackName, ProvideHandle providerInterface)
         {
             // Note that most methods in the AndroidAssetPacks class are either direct wrappers of java APIs in Google's PlayCore plugin,
             // or depend on values that the PlayCore API returns. If the PlayCore plugin is missing, calling these methods will throw an InvalidOperationException exception.
             try
             {
+				m_ProviderInterface = providerInterface;
                 AndroidAssetPacks.DownloadAssetPackAsync(new string[] { assetPackName }, CheckDownloadStatus);
             }
             catch (InvalidOperationException ioe)
             {
                 Debug.LogError($"Cannot retrieve state for asset pack '{assetPackName}'. PlayCore Plugin is not installed: {ioe.Message}");
-                m_ProviderInterface.Complete(this, false, new Exception("exception"));
+				providerInterface.Complete(this, false, new Exception("exception"));
             }
         }
 
@@ -86,6 +104,7 @@ namespace AddressablesPlayAssetDelivery
             {
                 string assetPackPath = AndroidAssetPacks.GetAssetPackPath(info.name);
 
+				Debug.Log("Download completed for pack " + info.name + "; Path = " + assetPackPath);
                 if (!string.IsNullOrEmpty(assetPackPath))
                 {
                     // Asset pack was located on device. Proceed with loading the bundle.
